@@ -4,19 +4,32 @@
 ;;;; Sample use:
 ;;;; (define-key lisp-mode-map (kbd "C-C C-a") 'asdf-browser)
 
+(defgroup 
+  asdf-browser 
+  nil
+  "asdf-browser custom group"
+  :prefix "asdf-browser")
+
+;; define single custom var
+(defcustom asdf-browser-show-loaded-systems-only t
+  "If asdf-browsr completion should include only loaded systems"
+  :group 'asdf-browser
+  :type 'boolean)
+
 (require 'cl)
 (require 'slime)
+(require 'slime-asdf)
 
 (defface asdf-browser-title-face
-    '((t (:foreground "cyan")))
+  '((t (:foreground "cyan")))
   nil)
 
 (defface asdf-browser-module-face
-    '((t (:foreground "cyan")))
+  '((t (:foreground "cyan")))
   nil)
 
 (defface asdf-browser-file-face
-    '((t ))
+  '((t ))
   nil)
 
 (defun asdf-browser-get-overlay-prop (point prop)
@@ -28,7 +41,7 @@
   (let ((foo (asdf-browser-get-overlay-prop (point) 'lisp-file)))
     (if foo
         (find-file foo)
-        (error "Item not clickable"))))
+      (error "Item not clickable"))))
 
 (defun asdf-browser-pop ()
   (interactive)
@@ -36,7 +49,7 @@
     (if foo
         (progn (setq asdf-browser-inhibit-stack t)
                (asdf-browser-go foo))
-        (error "Empty browser stack"))))
+      (error "Empty browser stack"))))
 
 (defun asdf-browser-reload ()
   (interactive)
@@ -65,25 +78,30 @@
     (error "Must be connected to an inferior Lisp")) 
   (slime-eval-async
    `(cl:labels ((aux (foo)
-                  (cl:typecase foo
-                    (asdf:module
-                       (cl:list* :module
-                                 (cl:slot-value foo 'asdf::name)
-                                 (cl:mapcar (cl:function aux)
-                                            (cl:slot-value
-                                             foo 'asdf::components))))
-                    (asdf:cl-source-file
-                       (cl:list :cl-source-file
-                                (cl:slot-value foo 'asdf::name)
-                                (cl:namestring
-                                 (asdf:component-pathname foo)))))))
-      (cl:let ((system (asdf:find-system (cl:make-symbol ,system))))
-        (cl:when system
-          (cl:list :name (cl:slot-value system 'asdf::name)
-                   :data (cl:mapcar (cl:function aux)
-                                    (cl:slot-value system 'asdf::components))
-                   :version (cl:and (cl:slot-boundp system 'asdf::version)
-                                    (cl:slot-value system 'asdf::version))))))
+                     (cl:typecase foo
+                                  (asdf:module
+                                   (cl:list* :module
+                                             (cl:slot-value foo 'asdf::name)
+                                             (cl:mapcar (cl:function aux)
+                                                        (cl:slot-value
+                                                         foo 'asdf::components))))
+                                  (asdf:cl-source-file
+                                   (cl:list :cl-source-file
+                                            (cl:slot-value foo 'asdf::name)
+                                            (cl:namestring
+                                             (asdf:component-pathname foo)))))))
+               (cl:let ((system (asdf:find-system (cl:make-symbol ,system))))
+                       (cl:when system
+                                (cl:list :name (cl:slot-value system 'asdf::name)
+                                         :data (cl:mapcar (cl:function aux)
+                                                          (cl:slot-value system 'asdf::components))
+                                         :asd-path (cl:namestring
+                                                    (cl:translate-logical-pathname
+                                                     (cl:merge-pathnames (cl:slot-value system 'asdf::relative-pathname)
+                                                                         (cl:make-pathname :name (cl:slot-value system 'asdf::name)
+                                                                                           :type "asd"))))
+                                         :version (cl:and (cl:slot-boundp system 'asdf::version)
+                                                          (cl:slot-value system 'asdf::version))))))
    k))
 
 (defun asdf-browser-line-coords ()
@@ -101,31 +119,40 @@
             (first nil)
             (buf (asdf-browser-ensure-buffer)))
         (labels ((pad ()
-                   (dotimes (i depth)
-                     (insert " ")))
+                      (dotimes (i depth)
+                        (insert " ")))
                  (aux (stuff)
-                   (pad)
-                   (ecase (car stuff)
-                     (:module
-                        (slime-insert-propertized
-                         '(face asdf-browser-module-face)
-                         (format "%s\n" (cadr stuff)))
-                        (let ((depth (1+ depth)))
-                          (mapc #'aux (cdddr stuff))))
-                     (:cl-source-file
-                        (or first (setq first (point)))
-                        (slime-insert-propertized
-                         '(face asdf-browser-file-face)
-                         (format "%s\n" (cadr stuff)))
-                        (multiple-value-bind (start end)
-                            (asdf-browser-line-coords)
-                          (overlay-put (make-overlay start end)
-                                       'lisp-file (caddr stuff)))))))
+                      (pad)
+                      (ecase (car stuff)
+                        (:module
+                         (slime-insert-propertized
+                          '(face asdf-browser-module-face)
+                          (format "%s\n" (cadr stuff)))
+                         (let ((depth (1+ depth)))
+                           (mapc #'aux (cdddr stuff))))
+                        (:cl-source-file
+                         (or first (setq first (point)))
+                         (slime-insert-propertized
+                          '(face asdf-browser-file-face)
+                          (format "%s\n" (cadr stuff)))
+                         (multiple-value-bind (start end)
+                             (asdf-browser-line-coords)
+                           (overlay-put (make-overlay start end)
+                                        'lisp-file (caddr stuff)))))))
           (erase-buffer)
           (slime-insert-propertized '(face asdf-browser-title-face)
                                     (format "ASDF System: %s %s\n\n"
                                             (getf foo :name)
                                             (or (getf foo :version) "")))
+          
+          (slime-insert-propertized '(face asdf-browser-title-face)
+                                    "system definition (asd)\n")
+
+          (multiple-value-bind (start end)
+              (asdf-browser-line-coords)
+            (overlay-put (make-overlay start end)
+                         'lisp-file (getf foo :asd-path)))
+          
           (mapc #'aux (getf foo :data))
           (when first
             (goto-char first)))
@@ -146,22 +173,28 @@
 (defun asdf-browser-go (system)
   (if (asdf-browser-system-exists-p system)
       (let ((buf (asdf-browser-ensure-buffer)))
-        (cond (asdf-browser-inhibit-stack
-               (setq asdf-browser-inhibit-stack nil))
-              (t
-               (when (and asdf-browser-system
-                          (not (string= asdf-browser-system system)))
-                 (push asdf-browser-system asdf-browser-stack))))
+        (cond (asdf-browser-inhibit-stack (setq asdf-browser-inhibit-stack nil))
+              (t (when (and asdf-browser-system
+                            (not (string= asdf-browser-system system)))
+                   (push asdf-browser-system asdf-browser-stack))))
         (asdf-browser-insert-into-buffer system))
-      (error "No such system: %s" system)))
+    (error "No such system: %s" system)))
 
 (defun asdf-browser-prompt ()
-  (if (and (boundp 'slime-modeline-package)
-           slime-modeline-package)
-      slime-modeline-package
-      (substring-no-properties (word-at-point))))
+  (cond ((and (boundp 'slime-modeline-package)
+              slime-modeline-package)
+         slime-modeline-package)
+        ((word-at-point) (substring-no-properties (word-at-point)))
+        (t "")))
+
+(defun asdf-browser-get-completion-list ()
+  (if asdf-browser-show-loaded-systems-only
+      (slime-eval `(swank:list-all-systems-known-to-asdf))
+    (slime-eval `(swank:list-asdf-systems))))
 
 (defun asdf-browser (&optional system)
   (interactive)
-  (let ((prompt (asdf-browser-prompt)))
-    (asdf-browser-go (or system (read-from-minibuffer "System: " prompt)))))
+  (let* ((prompt (asdf-browser-prompt))
+         (known-systems (asdf-browser-get-completion-list))
+         (alist (slime-bogus-completion-alist known-systems)))
+    (asdf-browser-go (or system (completing-read "System: " alist nil nil prompt)))))
