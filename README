@@ -20,7 +20,8 @@ INSTALLATION
 Simply clone git repo to somewhere on you disk and add to your .emacs
 the following line:
 
-(load-file "~/Documents/workspace/clbuild/source/slime/contrib/asdf-browser.el")
+;; suppose you've cloned repo to ~/.emacs.d/asdf-browser
+(load-file " ~/.emacs.d/asdf-browser/asdf-browser.el")
 
 
 For convinience you can bind it to some chord, mine is "C-c
