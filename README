@@ -13,3 +13,34 @@ customizing value of `asdf-browser-show-loaded-systems-only' custom
 variable you can make it to complete among all known packages.
 
 
+
+INSTALLATION
+==============
+
+Simply clone git repo to somewhere on you disk and add to your .emacs
+the following line:
+
+(load-file "~/Documents/workspace/clbuild/source/slime/contrib/asdf-browser.el")
+
+
+For convinience you can bind it to some chord, mine is "C-c
+C-a". Binding is done by adding this to .emacs:
+
+(define-key slime-mode-map "\C-c\C-a" 'asdf-browser)
+
+
+
+USAGE
+======
+
+Mx asdf-browser will prompt for system name in minibuffer. Note, that
+if you have cursor standing on some word, it will be put to
+minibuffer. 
+
+You can complete names with tab. If
+asdf-browser-show-loaded-systems-only is t, completion will be done
+only over already loaded system definitions, if it is nil, than
+completion is done over all known systems.
+
+Also, if you will browse through some unloaded system it's definition
+will become loaded because (asdf:find-system ...) loads it.
