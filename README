@@ -1,0 +1,15 @@
+asdf-browser for slime
+
+I took original code by Stanisław Halik (sthalik@test123.ltd.pl) from
+this c.l.l post
+http://groups.google.com/group/comp.lang.lisp/browse_thread/thread/ce68d8fb9b93c29d
+and slightly upgraded it.
+
+Two major features added - autocompletion of package names and ability
+to navigate to system definition file.
+
+Completion works for loaded system definitions by default, but by
+customizing value of `asdf-browser-show-loaded-systems-only' custom
+variable you can make it to complete among all known packages.
+
+
